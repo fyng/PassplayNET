@@ -1,0 +1,21 @@
+Time series coordinates:
+- Row: individual play records
+- Column: for the first 1 second, position of lineman (x,y coordinates)
+
+RNN (Input):
+- Row: individual play records
+- Column: position of lineman (x,y coordinates), fed in timeframe by timeframe
+
+
+Predict:
+Duration of the play
+
+Extensions:
+Attention
+Distance from QB instead of absolute coordinates
+Add player ID
+How does different duration of information seen change the accuracy?
+Dropout players
+
+
+
