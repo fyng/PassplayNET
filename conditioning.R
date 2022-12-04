@@ -1,11 +1,16 @@
 library(tidyverse)
 library(lubridate)
-
+source("joining.R")
 week_num = 1
 
 run = function() {
   weeks = load_weeks()
   plays = load_plays()
+  weeks_summarized = create_weekly_play_summary(weeks)
+  weeks_summarized = join_summarized_weeks_to_position(weeks_summarized)
+  weeks_summarized = pivot_by_role(weeks_summarized)
+  weeks_summarized = join_time_to_throw(weeks_summarized)
+  return(weeks_summarized)
 }
 
 read_plays = function() {
@@ -28,12 +33,26 @@ load_plays = function() {
 load_weeks = function() {
   weeks = read_week(1)
   weeks = condition_week_data(weeks)
-  # for (i in 2:8) {
-  #   new_week = read_week(i)
-  #   new_week_conditioned = condition_week_data(new_week)
-  #   weeks = rbind(weeks, new_week_conditioned)
-  # }
+  for (i in 2:8) {
+    new_week = read_week(i)
+    new_week_conditioned = condition_week_data(new_week)
+    weeks = rbind(weeks, new_week_conditioned)
+  }
+  create_time_to_play_dictionary(weeks)
   return(weeks)
+}
+
+create_time_to_play_dictionary = function(weeks) {
+  time_of_throw = weeks %>%
+    mutate(is_sack = str_detect(event, 'sack')) %>%
+    filter(is_throw == TRUE | is_sack == TRUE) %>%
+    group_by(gameId, playId) %>%
+    mutate(action_time = min(time_since_play_start, na.rm = TRUE)) %>%
+    select(gameId, playId, action_time, event) %>%
+    distinct(gameId, playId, .keep_all = TRUE) %>%
+    filter(action_time > 0, action_time < 60 * 5) # point of second part is to remove Inf value action_time plays (i.e. plays where likely snap time is unknown)
+  time_of_throw %>% write_csv("time_of_throw_or_sack.csv")
+  return(time_of_throw)
 }
 
 condition_plays = function(plays){
@@ -52,7 +71,7 @@ condition_plays = function(plays){
 condition_week_data = function(week) {
   
   week_data = week %>%
-    mutate(is_throw = ifelse(str_detect(event, "pass") & !str_detect(event, 'outcome'), TRUE, FALSE)) %>%
+    mutate(is_throw = ifelse(str_detect(event, "pass") & !str_detect(event, 'outcome') & !str_detect(event, 'interrupted'), TRUE, FALSE)) %>%
     mutate(time_of_throw = ifelse(str_detect(event, "pass") & !str_detect(event, 'outcome'), time, NA)) %>%
     arrange(gameId, playId, nflId, time, event, is_throw) %>%
     group_by(gameId, playId, nflId, time) %>%
@@ -91,7 +110,7 @@ create_weekly_play_summary = function(weeks) {
     mutate(time_since_play_start_rounded = round(time_since_play_start, 3)) %>%
     filter(!is.na(time_since_play_start)) %>%
     filter(time_since_play_start >= 0) %>%
-    filter(time_since_play_start_rounded < 1) %>%
+    filter(time_since_play_start_rounded <= 1) %>%
     arrange(time_since_play_start_rounded)
   weeks_summarized = weeks_summarized %>%
     pivot_wider(id_cols = c(gameId, playId, nflId),
