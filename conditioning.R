@@ -10,6 +10,14 @@ run = function() {
   weeks_summarized = join_summarized_weeks_to_position(weeks_summarized)
   weeks_summarized = pivot_by_role(weeks_summarized)
   weeks_summarized = join_time_to_throw(weeks_summarized)
+  week_data_play_direction = week_data %>% 
+    select(gameId, playId, playDirection) %>%
+    distinct(gameId, playId, playDirection, .keep_all = TRUE)
+  weeks_summarized_with_play_direction = weeks_summarized %>% left_join(
+    week_data_play_direction, by = c('gameId', 'playId')
+  )
+  weeks_summarized_with_play_direction = weeks_summarized_with_play_direction %>%
+    mutate(playDirection = as.factor(playDirection))
   return(weeks_summarized)
 }
 
@@ -113,7 +121,7 @@ create_weekly_play_summary = function(weeks) {
     filter(time_since_play_start_rounded <= 1) %>%
     arrange(time_since_play_start_rounded)
   weeks_summarized = weeks_summarized %>%
-    pivot_wider(id_cols = c(gameId, playId, nflId),
+    pivot_wider(id_cols = c(gameId, playId, nflId, playDirection),
                 names_from = time_since_play_start_rounded,
                 values_from = c(x, y, s, a, dis, o, dir))
   write_csv(weeks_summarized, "plays_by_player_with_motion.csv")
